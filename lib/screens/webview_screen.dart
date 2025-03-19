@@ -527,7 +527,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
               child: _buildWebView(),
             ),
           ),
-          if (_showSplash || !_permissionsGranted) _buildSplashOverlay(),
+          if (_showSplash || !_permissionsGranted) 
+           AnimatedOpacity(
+              opacity: _showSplash || !_permissionsGranted ? 1.0 : 0.0,
+              duration: Duration(milliseconds: 300), // Adjust duration for smooth fade
+              child: _buildSplashOverlay(),
+      ),
 
           // if (_progress < 100)
           //   Positioned(

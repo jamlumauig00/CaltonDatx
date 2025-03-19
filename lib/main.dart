@@ -4,6 +4,7 @@ import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Future.delayed(Duration(milliseconds: 50));  // Add a slight delay
 
     // ✅ Force fullscreen system UI mode
  // Enable edge-to-edge layout

@@ -22,28 +22,20 @@ dependencies:
   printing: ^5.11.0
   pdf: ^3.10.7
   pull_to_refresh: ^2.0.0
-  
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3 
-  flutter_native_splash: ^2.3.9
-
+  flutter_native_splash: ^2.0.4
 
 flutter_native_splash:
-  color: "#000000" # Fallback background color behind your image
-  image: assets/splash.png
-  fullscreen: true
-  android: true
-  ios: true
-
-  android_12:
-    image: assets/splash.png
-    icon_background_color: "#000000"
-    fullscreen: true
-
+  color: "#ffffff"  # Background color for the splash screen
+  image: assets/splash.png  # Path to your splash image
+  android: true  # Enable splash screen for Android
+  ios: true  # Enable splash screen for iOS
+  fullscreen: true  # Ensure the image fills the entire screen
 
 flutter_icons:
   android: true
@@ -54,3 +46,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/splash.png
+    - assets/icons/calton_logo.png
