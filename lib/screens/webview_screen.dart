@@ -452,6 +452,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
         onWebViewCreated: (controller) {
           webViewController = controller;
           _injectViewportAndPrintHandler(controller);
+          _setUpJavaScriptHandlers();
+          _addJavaScriptHandlers();
+          _printHandler();
+          _injectSpeechRecognitionJs();
+        
         },
         gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
           Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
