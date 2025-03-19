@@ -1,0 +1,56 @@
+name: caltondatx
+description: "caltonDatx"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.0.0-beta.27
+  webview_flutter: ^4.2.2
+  permission_handler: ^11.4.0
+  path_provider: ^2.1.5
+  open_file: ^3.3.2
+  file_picker: ^9.0.2
+  http: ^0.13.6
+  mime: ^1.0.4
+  cupertino_icons: ^1.0.8
+  speech_to_text: ^7.0.0
+  printing: ^5.11.0
+  pdf: ^3.10.7
+  pull_to_refresh: ^2.0.0
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3 
+  flutter_native_splash: ^2.3.9
+
+
+flutter_native_splash:
+  color: "#000000" # Fallback background color behind your image
+  image: assets/splash.png
+  fullscreen: true
+  android: true
+  ios: true
+
+  android_12:
+    image: assets/splash.png
+    icon_background_color: "#000000"
+    fullscreen: true
+
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/calton_logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/splash.png
