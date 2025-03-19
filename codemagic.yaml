@@ -1,0 +1,32 @@
+workflows:
+  ios-appetize-upload:
+    name: iOS Appetize Upload
+    environment:
+      flutter: stable
+      xcode: latest
+    scripts:
+      - name: Build iOS Simulator App
+        script: |
+          flutter clean
+          flutter build ios --simulator
+
+      - name: Zip the .app bundle
+        script: |
+          cd build/ios/iphonesimulator/
+          zip -r Runner.app.zip Runner.app
+
+      - name: Upload to Appetize.io
+        script: |
+          RESPONSE=$(curl -s -X POST https://api.appetize.io/v1/apps \
+          -H "Content-Type: multipart/form-data" \
+          -F "file=@build/ios/iphonesimulator/Runner.app.zip" \
+          -F "platform=ios" \
+          -F "note=Uploaded from Codemagic CI" \
+          -F "privateKey=${tok_ew77ctdwblmkthmu2hgkybuvo4}")
+          
+          echo "✅ Upload successful!"
+          echo "🔗 Appetize Public URL:"
+          echo $RESPONSE | grep -o '"publicURL":"[^"]*' | cut -d':' -f2-
+
+    artifacts:
+      - build/ios/iphonesimulator/Runner.app.zip
