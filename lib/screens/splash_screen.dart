@@ -17,7 +17,11 @@ class _SplashScreenState extends State<SplashScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const WebViewScreen()),
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const WebViewScreen(),
+          transitionDuration: Duration.zero, // No transition
+          reverseTransitionDuration: Duration.zero, // No reverse transition
+        ),
       );
     });
   }

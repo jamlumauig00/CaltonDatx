@@ -21,7 +21,12 @@ dependencies:
   speech_to_text: ^7.0.0
   printing: ^5.11.0
   pdf: ^3.10.7
-  pull_to_refresh: ^2.0.0
+  pull_to_refresh_flutter3: ^2.0.2
+  file_saver: ^0.2.14
+  share_plus: ^7.2.1
+  change_app_package_name: ^1.5.0
+  dashed_circular_progress_bar: ^0.0.6
+
 
 dev_dependencies:
   flutter_test:
@@ -31,11 +36,14 @@ dev_dependencies:
   flutter_native_splash: ^2.0.4
 
 flutter_native_splash:
-  color: "#ffffff"  # Background color for the splash screen
-  image: assets/splash.png  # Path to your splash image
-  android: true  # Enable splash screen for Android
-  ios: true  # Enable splash screen for iOS
-  fullscreen: true  # Ensure the image fills the entire screen
+  image: assets/splash.png  # Full-screen image
+  background_image: assets/splash.png  # (Optional) Separate background
+  android: true
+  ios: true
+  fullscreen: true
+  android_12:
+    image: assets/splash.png
+    icon_background_color: "#ffffff"  # Optional
 
 flutter_icons:
   android: true

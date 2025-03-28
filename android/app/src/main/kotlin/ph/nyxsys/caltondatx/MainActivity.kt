@@ -1,4 +1,4 @@
-package ph.nyxsys.caltondatx.caltondatx
+package ph.nyxsys.caltondatx
 
 import io.flutter.embedding.android.FlutterActivity
 
