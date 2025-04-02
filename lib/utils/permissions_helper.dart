@@ -11,11 +11,11 @@ class PermissionHelper {
       Permission.location,
       Permission.storage,
       Permission.camera,
-      Permission.audio
+      Permission.audio,
     ].request();
   }
 
-   // Check if specific permissions are granted
+  // Check if specific permissions are granted
   static Future<bool> isPermissionGranted(Permission permission) async {
     final status = await permission.status;
     return status.isGranted;

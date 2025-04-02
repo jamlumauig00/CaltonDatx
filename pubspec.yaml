@@ -42,7 +42,7 @@ flutter_native_splash:
   ios: true
   fullscreen: true
   android_12:
-    image: assets/splash.png
+    image: assets/icons/calton_logo.png
     icon_background_color: "#ffffff"  # Optional
 
 flutter_icons:

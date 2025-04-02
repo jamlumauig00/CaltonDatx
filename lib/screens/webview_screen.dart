@@ -25,13 +25,16 @@ class WebViewScreen extends StatefulWidget {
 
 class _WebViewScreenState extends State<WebViewScreen> {
   late InAppWebViewController webViewController;
-  final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  final RefreshController _refreshController = RefreshController(
+    initialRefresh: false,
+  );
   bool _permissionsGranted = false;
   bool _showSplash = true;
   bool _webViewLoaded = false;
   bool _jsSystemLoadReceived = false;
+  int _backPressedCount = 0;
 
-// Track the downward drag offset (in pixels)
+  // Track the downward drag offset (in pixels)
   double _dragOffset = 0.0;
   // Set a threshold for triggering refresh
   final double _dragThreshold = 80.0;
@@ -43,14 +46,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool pullToRefreshEnabled = true;
   final String webUrl = "https://beta.caltondatx.com";
 
- @override
+  @override
   void initState() {
     super.initState();
-  
     _requestPermissions();
-
-    
   }
+
   Future<void> _requestPermissions() async {
     try {
       await PermissionHelper.requestPermissions();
@@ -64,7 +65,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
   }
 
- /*  Future<void> _onRefresh() async {
+  /*  Future<void> _onRefresh() async {
     await webViewController.reload();
     pullToRefreshController.refreshCompleted();
   } */
@@ -83,9 +84,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
       _isRefreshing = false;
     });
   }
-  
-  Future<void> _injectViewportAndPrintHandler(InAppWebViewController controller) async {
-    await controller.evaluateJavascript(source: """
+
+  Future<void> _injectViewportAndPrintHandler(
+    InAppWebViewController controller,
+  ) async {
+    await controller.evaluateJavascript(
+      source: """
       var metas = document.getElementsByTagName('meta');
       for (var i = metas.length - 1; i >= 0; i--) {
         if (metas[i].name === "viewport") {
@@ -108,13 +112,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
           console.log('window.flutter_inappwebview not found');
         }
       };
-    """);
+    """,
+    );
   }
 
   // Function to pick the save directory
   Future<String?> pickSaveDirectory() async {
     final result = await FilePicker.platform.getDirectoryPath();
-    return result;  // Return selected directory or null
+    return result; // Return selected directory or null
   }
 
   // Function to get file extension from mime type
@@ -163,8 +168,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   Future<void> _handleDownloadStartRequest(String downloadUrl) async {
-      if (kDebugMode) { print("❌ downloadUrl: $downloadUrl");} 
-      await webViewController.evaluateJavascript(source: """
+    if (kDebugMode) {
+      print("❌ downloadUrl: $downloadUrl");
+    }
+    await webViewController.evaluateJavascript(
+      source: """
             var metas = document.getElementsByTagName('meta');
             for (var i = metas.length - 1; i >= 0; i--) {
               if (metas[i].name === "viewport") {
@@ -175,50 +183,117 @@ class _WebViewScreenState extends State<WebViewScreen> {
             meta.name = "viewport";
             meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
             document.getElementsByTagName('head')[0].appendChild(meta);
-            """);
+            """,
+    );
 
-          await webViewController.evaluateJavascript(source: """
+    await webViewController.evaluateJavascript(
+      source: """
             window.print = function() {
               window.flutter_inappwebview.callHandler('Print', document.documentElement.outerHTML);
             };
-            """);
+            """,
+    );
   }
 
   void _setUpJavaScriptHandlers() {
     // Handler for CSV downloads
-      webViewController.addJavaScriptHandler(
+    webViewController.addJavaScriptHandler(
       handlerName: 'onCSVHandler',
       callback: (args) async {
         try {
           debugPrint("✅ Received data 3 from JavaScript: $args");
 
-           final Map<String, dynamic>? data = args[0] as Map<String, dynamic>?;
-            if (data == null) throw Exception("Received null data");
-            final filename = args[0]['filename'];
-            debugPrint("✅ Received filename1 from JavaScript: $filename");
+          final Map<String, dynamic>? data = args[0] as Map<String, dynamic>?;
+          if (data == null) throw Exception("Received null data");
+          final filename = args[0]['filename'];
+          debugPrint("✅ Received filename1 from JavaScript: $filename");
 
-            final String? csvContent = data['content'] as String?;
-            if (csvContent == null || csvContent.isEmpty) {
-              throw Exception("CSV content is empty");
+          final String? csvContent = data['content'] as String?;
+          if (csvContent == null || csvContent.isEmpty) {
+            throw Exception("CSV content is empty");
+          }
+          final bytes = utf8.encode(csvContent); // Convert CSV content to bytes
+          String? savePath;
+
+          if (Platform.isAndroid) {
+            // 📌 Ask Android user where to save the file
+            savePath = await FilePicker.platform.getDirectoryPath();
+
+            if (savePath != null) {
+              savePath = "$savePath/$filename";
+            } else {
+              // Default to Downloads folder if user doesn't pick a location
+              savePath = "/storage/emulated/0/Download/$filename";
             }
-            final bytes = utf8.encode(csvContent); // Convert CSV content to bytes
-            String? savePath;
+          } else if (Platform.isIOS) {
+            // 📌 iOS: Save to app's documents directory
+            Directory directory = await getApplicationDocumentsDirectory();
+            savePath = "${directory.path}/$filename";
+          }
 
-            if (Platform.isAndroid) {
-              // 📌 Ask Android user where to save the file
-              savePath = await FilePicker.platform.getDirectoryPath();
+          // Ensure savePath is valid
+          if (savePath == null) {
+            debugPrint("❌ No valid save path found.");
+            return;
+          }
 
-              if (savePath != null) {
-                savePath = "$savePath/$filename";
-              } else {
-                // Default to Downloads folder if user doesn't pick a location
-                savePath = "/storage/emulated/0/Download/$filename";
-              }
-            } 
-            else if (Platform.isIOS) {
-              // 📌 iOS: Save to app's documents directory
-              Directory directory = await getApplicationDocumentsDirectory();
-              savePath = "${directory.path}/$filename";
+          // Check if file already exists and get a unique filename if necessary
+          savePath = getUniqueFileName(savePath, ".csv");
+
+          File file = File(savePath);
+          await file.writeAsBytes(bytes);
+          debugPrint("✅ File saved at: $savePath");
+
+          if (Platform.isAndroid) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("✅ Downloaded: $filename")),
+              );
+            }
+          }
+          // Open the saved file
+          await OpenFile.open(file.path);
+        } catch (e) {
+          debugPrint("❌ Error saving file: $e");
+        }
+      },
+    );
+
+    // 📌 JavaScript handler to receive PNG data
+    webViewController.addJavaScriptHandler(
+      handlerName: 'onPNGHandler',
+      callback: (args) async {
+        try {
+          if (args.isEmpty) {
+            debugPrint("❌ No data received.");
+            return;
+          }
+
+          final data = args[0];
+          final base64String = data['base64'];
+
+          if (base64String == null || !base64String.contains(',')) {
+            debugPrint("❌ Invalid Base64 data.");
+            return;
+          }
+
+          // Extract only the Base64 image data (remove 'data:image/png;base64,')
+          final base64Data = base64String.split(',').last;
+          final bytes = base64Decode(base64Data);
+          String? savePath;
+
+          // Determine file name
+          final fileName = data['filename'] ?? "downloaded_image.png";
+
+          // 📌 Save file based on platform
+          if (Platform.isAndroid) {
+            savePath = await FilePicker.platform.getDirectoryPath();
+
+            if (savePath != null) {
+              savePath = "$savePath/$fileName";
+            } else {
+              // Default to Downloads folder if user doesn't pick a location
+              savePath = "/storage/emulated/0/Download/$fileName";
             }
 
             // Ensure savePath is valid
@@ -228,82 +303,43 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
 
             // Check if file already exists and get a unique filename if necessary
-            savePath = getUniqueFileName(savePath);
+            savePath = getUniqueFileName(savePath, ".png");
 
             File file = File(savePath);
             await file.writeAsBytes(bytes);
             debugPrint("✅ File saved at: $savePath");
 
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("✅ Downloaded: $fileName")),
+              );
+            }
             // Open the saved file
             await OpenFile.open(file.path);
-          } catch (e) {
-            debugPrint("❌ Error saving file: $e");
+          } else if (Platform.isIOS) {
+            Directory directory = await getApplicationCacheDirectory();
+            String filePath = '${directory.path}/$fileName';
+            File file = File(filePath);
+            await file.writeAsBytes(bytes);
+
+            debugPrint("✅ PNG saved at: $filePath");
+
+            // Open the file (optional)
+            await OpenFile.open(filePath);
           }
-        } 
-          );   
+        } catch (e) {
+          if (kDebugMode) {
+            print("❌ Error saving base64 image: $e");
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('❌ Failed to download image')),
+            );
+          }
+        }
+      },
+    );
 
-      // 📌 JavaScript handler to receive PNG data
-          webViewController.addJavaScriptHandler(
-            handlerName: 'onPNGHandler',
-            callback: (args) async {
-              try {
-                if (args.isEmpty) {
-                  debugPrint("❌ No data received.");
-                  return;
-                }
-
-                final data = args[0];
-                final base64String = data['base64'];
-
-                if (base64String == null || !base64String.contains(',')) {
-                  debugPrint("❌ Invalid Base64 data.");
-                  return;
-                }
-
-                // Extract only the Base64 image data (remove 'data:image/png;base64,')
-                final base64Data = base64String.split(',').last;
-                final bytes = base64Decode(base64Data);
-
-                // Determine file name
-                final fileName = data['filename'] ?? "downloaded_image.png";
-
-                // 📌 Save file based on platform
-                if(Platform.isAndroid){
-                  final saveDirectory = await FilePicker.platform.getDirectoryPath();
-                  String finalPath = saveDirectory ?? (await getDownloadsDirectory())?.path ?? '';
-
-                  if (finalPath.isEmpty) {
-                    debugPrint("❌ Could not get valid save location.");
-                    return;
-                  }
-                    final filePath = path.join(finalPath, fileName);
-                    final file = File(filePath);
-                    await file.writeAsBytes(bytes);
-                    await OpenFile.open(file.path);
-                }else if(Platform.isIOS){
-                    Directory directory = await getApplicationCacheDirectory();
-                    String filePath = '${directory.path}/$fileName';
-                    File file = File(filePath);
-                    await file.writeAsBytes(bytes);
-
-                    debugPrint("✅ PNG saved at: $filePath");
-
-                    // Open the file (optional)
-                    await OpenFile.open(filePath);
-                }
-                } catch (e) {
-                  if (kDebugMode) {
-                    print("❌ Error saving base64 image: $e");
-                  }
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('❌ Failed to download image')),
-                    );
-                  }
-                }
-            },
-          );
- 
     // Handler for PDF file download
     webViewController.addJavaScriptHandler(
       handlerName: 'downloadBase64File',
@@ -317,45 +353,55 @@ class _WebViewScreenState extends State<WebViewScreen> {
           final bytes = base64Decode(base64);
           extensionFromMime(mimeType);
 
-          if (Platform.isAndroid){
-          // Ask user to pick save directory
-           final saveDirectory = await pickSaveDirectory();
-          if (saveDirectory != null) {
-            final sanitizedFilename = filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-            final filePath = path.join(saveDirectory, sanitizedFilename);
-            final file = File(filePath);
+          String? savePath;
+
+          // 📌 Save file based on platform
+          if (Platform.isAndroid) {
+            savePath = await FilePicker.platform.getDirectoryPath();
+
+            if (savePath != null) {
+              savePath = "$savePath/$filename";
+            } else {
+              // Default to Downloads folder if user doesn't pick a location
+              savePath = "/storage/emulated/0/Download/$filename";
+            }
+
+            // Ensure savePath is valid
+            if (savePath == null) {
+              debugPrint("❌ No valid save path found.");
+              return;
+            }
+
+            // Check if file already exists and get a unique filename if necessary
+            savePath = getUniqueFileName(savePath, ".pdf");
+
+            File file = File(savePath);
+            await file.writeAsBytes(bytes);
+            debugPrint("✅ File saved at: $savePath");
+
+            // Open the saved file
+            await OpenFile.open(file.path);
+          } else {
+            Directory directory = await getApplicationDocumentsDirectory();
+            String filePath = path.join(directory.path, filename);
+            File file = File(filePath);
             await file.writeAsBytes(bytes);
 
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text("✅ Downloaded: $filename")),
               );
-            }
-            await OpenFile.open(file.path);
-          } 
-          }else {
-          Directory directory = await getApplicationDocumentsDirectory();
-          String filePath = path.join(directory.path, filename);
-          File file = File(filePath);
-          await file.writeAsBytes(bytes);      
-         
-          /* if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("✅ Downloaded: $filename")),
-              );
               await OpenFile.open(file.path, type: "application/pdf");
-            } */
-          await OpenFile.open(file.path, type: "application/pdf");
-
+            }
+            await OpenFile.open(file.path, type: "application/pdf");
           }
-
         } catch (e) {
           debugPrint("PDF Download error: $e");
           if (context.mounted) {
             // ignore: use_build_context_synchronously
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("❌ Failed to download PDF")),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text("❌ Failed to download PDF")));
           }
         }
       },
@@ -364,15 +410,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   void _printHandler() {
     webViewController.addJavaScriptHandler(
-    handlerName: "print",
-    callback: (args) async {
+      handlerName: "print",
+      callback: (args) async {
         final htmlContent = args[0]['html'];
         debugPrint("✅ PRINT HANDLER TRIGGERED!");
         debugPrint("htmlContent: $htmlContent");
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Print Handler Triggered")),
-        );
 
         await Printing.layoutPdf(
           onLayout: (format) async {
@@ -395,9 +437,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
       callback: (args) {
         String transcript = args[0];
         debugPrint("Speech Recognized: $transcript");
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("Speech recognized: $transcript"),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Speech recognized: $transcript")),
+        );
       },
     );
 
@@ -406,37 +448,36 @@ class _WebViewScreenState extends State<WebViewScreen> {
       callback: (args) {
         String error = args[0];
         debugPrint("Speech Recognition Error: $error");
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("Speech recognition error: $error"),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Speech recognition error: $error")),
+        );
       },
     );
   }
 
- 
-
-   Widget _buildSplashOverlay() {
-    return Stack( // ✅ Correct: Wrap Positioned inside a Stack
-    children: [
-      Positioned.fill(
-      child: Container(
-        color: Colors.black,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset('assets/splash.png', fit: BoxFit.cover),
+  Widget _buildSplashOverlay() {
+    return Stack(
+      // ✅ Correct: Wrap Positioned inside a Stack
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: Colors.black,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset('assets/splash.png', fit: BoxFit.cover),
+                ),
+                const Positioned(
+                  bottom: 50,
+                  left: 0,
+                  right: 0,
+                  child: Center(child: LoadingTextAnimation()),
+                ),
+              ],
             ),
-            const Positioned(
-              bottom: 50,
-              left: 0,
-              right: 0,
-              child: Center(child: LoadingTextAnimation()),
-            ),
-          ],
+          ),
         ),
-      ),
-    ),
-    ],
+      ],
     );
   }
 
@@ -447,22 +488,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
         initialUrlRequest: URLRequest(url: WebUri(webUrl)),
         // ignore: deprecated_member_use
         initialOptions: InAppWebViewGroupOptions(
-        crossPlatform: InAppWebViewOptions(
-          mediaPlaybackRequiresUserGesture: false,
-           disableHorizontalScroll: false,
-           disableVerticalScroll: false, // Ensure scrolling is enabled
-           supportZoom: false,
-          //allowsInlineMediaPlayback: true,
+          crossPlatform: InAppWebViewOptions(
+            mediaPlaybackRequiresUserGesture: false,
+            disableHorizontalScroll: false,
+            disableVerticalScroll: false, // Ensure scrolling is enabled
+            supportZoom: false,
+            //allowsInlineMediaPlayback: true,
+          ),
+          ios: IOSInAppWebViewOptions(
+            allowsLinkPreview: false, // Disables long press preview on iOS
+            allowsBackForwardNavigationGestures: true,
+            isPagingEnabled: false, // Ensures better scrolling behavior
+            allowsInlineMediaPlayback: true,
+            allowsAirPlayForMediaPlayback: true,
+            scrollsToTop: true,
+          ),
         ),
-        ios: IOSInAppWebViewOptions(
-          allowsBackForwardNavigationGestures: true,
-          isPagingEnabled: false,  // Ensures better scrolling behavior
-          allowsInlineMediaPlayback: true,
-          allowsAirPlayForMediaPlayback: true,
-          scrollsToTop: true
-          
-        ),
-      ),  
         onPermissionRequest: (controller, request) async {
           return PermissionResponse(
             resources: request.resources,
@@ -470,19 +511,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
           );
         },
         initialSettings: InAppWebViewSettings(
-          allowsBackForwardNavigationGestures: true, // Enables swipe gestures in iOS
+          allowsBackForwardNavigationGestures:
+              true, // Enables swipe gestures in iOS
           isInspectable: true,
           disallowOverScroll: false,
-          cacheEnabled: true, 
+          cacheEnabled: true,
           useShouldInterceptRequest: false, // Allow WebView to manage caching
-          useOnLoadResource: true, 
+          useOnLoadResource: true,
           useHybridComposition: true,
           javaScriptEnabled: true,
           allowFileAccessFromFileURLs: true,
           allowUniversalAccessFromFileURLs: true,
           //javascriptMode: JavascriptMode.unrestricted, // Enable JavaScript
           allowsInlineMediaPlayback: true,
-          allowsLinkPreview : false,
+          allowsLinkPreview: false,
           mediaPlaybackRequiresUserGesture: false,
           builtInZoomControls: false,
           displayZoomControls: false,
@@ -498,33 +540,39 @@ class _WebViewScreenState extends State<WebViewScreen> {
           _printHandler();
           _injectSpeechRecognitionJs();
         },
-       gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-        Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
-      },          
+        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+          Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+        },
         onLoadStop: (controller, url) async {
           _refreshController.refreshCompleted();
           await _injectViewportAndPrintHandler(controller);
           //setState(() => _showSplash = false);
+          await controller.evaluateJavascript(
+            source: """
+              document.addEventListener('contextmenu', event => event.preventDefault());
+              document.addEventListener('selectstart', event => event.preventDefault());
+            """,
+          );
         },
 
         onLoadError: (controller, url, code, message) {
           _refreshController.refreshFailed();
         },
-         onReceivedError: (controller, request, error) {
-              //pullToRefreshController2?.endRefreshing();
-            },
-            onScrollChanged: (controller, x, y) {
-            setState(() {
-              _webViewScrollOffset = y.toDouble();
-            });
-          },
+        onReceivedError: (controller, request, error) {
+          //pullToRefreshController2?.endRefreshing();
+        },
+        onScrollChanged: (controller, x, y) {
+          setState(() {
+            _webViewScrollOffset = y.toDouble();
+          });
+        },
 
         onProgressChanged: (controller, progress) {
           setState(() {
             if (progress >= 100) {
-             _webViewLoaded = true;
-            _refreshController.refreshCompleted();
-            _maybeHideSplash();
+              _webViewLoaded = true;
+              _refreshController.refreshCompleted();
+              _maybeHideSplash();
             }
           });
         },
@@ -544,46 +592,75 @@ class _WebViewScreenState extends State<WebViewScreen> {
         onConsoleMessage: (controller, consoleMessage) async {
           debugPrint("Console Log: ${consoleMessage.message}");
 
-          if (consoleMessage.message.contains("Speech Recognition Error: not-allowed")) {
+          if (consoleMessage.message.contains(
+            "Speech Recognition Error: not-allowed",
+          )) {
             await Permission.microphone.request();
           }
 
           if (consoleMessage.message.contains("System Load")) {
-          setState(() {
-            _jsSystemLoadReceived = true;
-            _maybeHideSplash();
-          });
-        }
+            setState(() {
+              _jsSystemLoadReceived = true;
+              _maybeHideSplash();
+            });
+          }
         },
       ),
     );
   }
 
- void _maybeHideSplash() {
+  void _maybeHideSplash() {
     if (_webViewLoaded && _jsSystemLoadReceived) {
       setState(() {
         _showSplash = false;
       });
     }
   }
-@override
+
+  Future<bool> _onWillPop() async {
+    // If the WebView can navigate back, do so.
+    if (await webViewController.canGoBack()) {
+      webViewController.goBack();
+      _backPressedCount = 0; // Reset the counter on WebView navigation.
+      return false;
+    }
+    // If no back history exists in the WebView.
+    if (_backPressedCount == 0) {
+      // First press: show message and increment counter.
+      _backPressedCount++;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Press back twice to exit")));
+      return false;
+    } else {
+      // Second press: exit the app.
+      return true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        bottom: false, // Bottom safe area disabled
-        child: Stack(
+    // ignore: deprecated_member_use
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        body: Stack(
           children: [
-            // WebView fills the screen and scrolls normally.
+            // ✅ WebView is positioned correctly
             Positioned.fill(
-              child: _buildWebView(),
+              child: SafeArea(
+                bottom: false, // Adjust as needed
+                child: _buildWebView(),
+              ),
             ),
-            // Overlay GestureDetector only active when WebView is scrolled near top.
+
+            // ✅ GestureDetector is fine
             if (_webViewScrollOffset <= 10)
               Positioned(
                 top: 0,
                 left: 50,
-                right:150,
-                height: 150, // Detection area at the top
+                right: 150,
+                height: 200,
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onVerticalDragUpdate: (details) {
@@ -601,15 +678,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       _dragOffset = 0.0;
                     });
                   },
-                  child: Container(
-                    color: Colors.transparent,
-                  ),
+                  child: Container(color: Colors.transparent),
                 ),
               ),
-            // Optional refresh indicator overlay.
+
+            if (_showSplash || !_permissionsGranted)
+              AnimatedOpacity(
+                opacity: _showSplash || !_permissionsGranted ? 1.0 : 0.0,
+                duration: Duration(milliseconds: 300),
+                child: _buildSplashOverlay(),
+              ),
+
             if (_isRefreshing)
               Positioned(
-                top: 40,
+                top: 350,
                 left: 0,
                 right: 0,
                 child: Center(
@@ -620,19 +702,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     startAngle: 0,
                     foregroundColor: Color(0xFF183465),
                     backgroundColor: const Color(0xffeeeeee),
-                    foregroundStrokeWidth: 7,
-                    backgroundStrokeWidth: 7,
+                    foregroundStrokeWidth: 5,
+                    backgroundStrokeWidth: 8,
                     foregroundGapSize: 5,
                     foregroundDashSize: 40,
                     backgroundGapSize: 5,
                     backgroundDashSize: 40,
                     animation: true,
-                    child: const Icon(
-                      Icons.favorite,
-                      color: Colors.white,
-                      size: 20
-                    ),
-                  )
+                  ),
                 ),
               ),
           ],
@@ -641,22 +718,34 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  String getUniqueFileName(String filePath) {
-      File file = File(filePath);
-      if (!file.existsSync()) return filePath; // If file doesn't exist, use original path
+  String getUniqueFileName(String filePath, String fileType) {
+    // Create a File instance from the given filePath.
+    File file = File(filePath);
 
-      String dir = file.parent.path;
-      String name = file.uri.pathSegments.last;
-      String baseName = name.replaceAll(RegExp(r'\.csv$'), ''); // Remove .csv extension
-      int count = 1;
+    // If the file doesn't exist, we can use the original filePath.
+    if (!file.existsSync()) return filePath;
 
-      // Loop until we find a unique fiSlename
-      while (file.existsSync()) {
-        filePath = "$dir/$baseName ($count).csv";
-        file = File(filePath);
-        count++;
+    // Extract the directory and the file name.
+    String dir = file.parent.path;
+    String name = file.uri.pathSegments.last;
+
+    // Remove the file extension (fileType) to get a base name.
+    String baseName = name.replaceAll(RegExp(RegExp.escape(fileType)), '');
+    int count = 1;
+
+    // Loop until a unique file name is found.
+    while (file.existsSync()) {
+      // Build a new file path with a counter appended.
+      String newFilePath = "$dir/$baseName ($count)$fileType";
+      file = File(newFilePath);
+      count++;
+      // When file.existsSync() returns false, newFilePath is unique.
+      if (!file.existsSync()) {
+        return newFilePath;
       }
-      return filePath;
+    }
+
+    // Fallback (should never reach here)
+    return filePath;
   }
 }
-

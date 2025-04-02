@@ -20,7 +20,7 @@ class _LoadingTextAnimationState extends State<LoadingTextAnimation> {
   void _startAnimation() {
     Future.doWhile(() async {
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Only update the state if the widget is still mounted
       if (mounted) {
         setState(() {

@@ -4,21 +4,23 @@ import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Future.delayed(Duration(milliseconds: 50));  // Add a slight delay
+  await Future.delayed(Duration(milliseconds: 50)); // Add a slight delay
 
-    // ✅ Force fullscreen system UI mode
- // Enable edge-to-edge layout
+  // ✅ Force fullscreen system UI mode
+  // Enable edge-to-edge layout
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   // Optional: make status & nav bar transparent
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.dark,
-    statusBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
   // ✅ Optional: set UI overlay styles
-/*   SystemChrome.setSystemUIOverlayStyle(
+  /*   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       systemNavigationBarColor: Colors.transparent,
@@ -26,7 +28,7 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   ); */
-  
+
   runApp(const MyApp());
 }
 
@@ -38,7 +40,6 @@ class MyApp extends StatelessWidget {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
       home: SplashScreen(),
-      
     );
   }
 }
