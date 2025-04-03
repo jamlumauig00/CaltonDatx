@@ -366,12 +366,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
               savePath = "/storage/emulated/0/Download/$filename";
             }
 
-            // Ensure savePath is valid
-            if (savePath == null) {
-              debugPrint("❌ No valid save path found.");
-              return;
-            }
-
             // Check if file already exists and get a unique filename if necessary
             savePath = getUniqueFileName(savePath, ".pdf");
 
@@ -380,20 +374,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
             debugPrint("✅ File saved at: $savePath");
 
             // Open the saved file
-            await OpenFile.open(file.path);
+            await OpenFile.open(file.path, type: "application/pdf");
           } else {
             Directory directory = await getApplicationDocumentsDirectory();
             String filePath = path.join(directory.path, filename);
             File file = File(filePath);
             await file.writeAsBytes(bytes);
-
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("✅ Downloaded: $filename")),
-              );
-              await OpenFile.open(file.path, type: "application/pdf");
-            }
-            await OpenFile.open(file.path, type: "application/pdf");
+            await OpenFile.open(filePath);
           }
         } catch (e) {
           debugPrint("PDF Download error: $e");
